@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Error | FTE Location Planner{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>Something went wrong</h1>
+  <div class="error-box">
+    <p>{{ message }}</p>
+    {% if detail %}<p class="muted">{{ detail }}</p>{% endif %}
+  </div>
+  <a href="/" class="btn btn-primary">Back to Upload</a>
+</section>
+{% endblock %}

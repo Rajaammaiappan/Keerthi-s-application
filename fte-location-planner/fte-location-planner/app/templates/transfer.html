@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Transfer Mapping | FTE Location Planner{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div>
+    <h1>Transfer Mapping</h1>
+    <p class="subtitle">Potential transfer opportunities between locations, and manual mapping entries.</p>
+  </div>
+  <a href="#" id="export-link" class="btn btn-primary">Download Analyzed Report (.xlsx)</a>
+</section>
+
+<section id="filter-bar" class="filter-bar" data-periods='{{ periods|tojson }}' data-categories='{{ categories|tojson }}' data-dims='{{ dims|tojson }}'></section>
+
+<section class="compare-bar">
+  <label>From Period
+    <select id="from-period"></select>
+  </label>
+  <label>To Period
+    <select id="to-period"></select>
+  </label>
+</section>
+
+<section class="panel">
+  <h2>Potential Transfer Opportunities</h2>
+  <p class="muted">Locations releasing capacity matched against locations/accounts with growing demand.</p>
+  <div class="table-scroll"><table id="transfer-table" class="data-table"></table></div>
+</section>
+
+<section class="panel">
+  <h2>Create Manual Mapping</h2>
+  <form id="manual-mapping-form" class="inline-form">
+    <input name="from_customer" placeholder="From Customer" required>
+    <input name="from_location" placeholder="From Location" required>
+    <input name="to_customer" placeholder="To Customer" required>
+    <input name="to_location" placeholder="To Location" required>
+    <input name="fte_amount" type="number" step="0.1" placeholder="FTE Amount" required>
+    <input name="notes" placeholder="Notes (optional)">
+    <button type="submit" class="btn btn-primary">Add Mapping</button>
+  </form>
+  <div class="table-scroll"><table id="manual-mapping-table" class="data-table"></table></div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>document.addEventListener('DOMContentLoaded', () => FTE.initTransfer());</script>
+{% endblock %}
