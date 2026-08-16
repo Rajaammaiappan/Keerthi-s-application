@@ -1,4 +1,4 @@
-# FTE Location Mapping & Workforce Planning Tool
+# OptiView — FTE Location & Workforce Planning Tool
 
 A Python/FastAPI web application that turns a raw workforce/FTE Excel tracker
 into an interactive **Location Mapping Matrix** and workforce-planning

@@ -184,6 +184,96 @@ tbody tr:hover { background: #f7f9fc; }
 .bar-seg { height: 100%; transition: width .2s; }
 .bar-total { font-size: 12px; color: var(--muted); text-align: right; }
 
+/* -------------------------------------------------------------------
+   Chat bubbles -- shared by the assistant widget's feed.
+-------------------------------------------------------------------- */
+.chat-entry { display: flex; }
+.chat-entry.chat-question { justify-content: flex-end; }
+.chat-entry.chat-answer, .chat-entry.chat-error { flex-direction: column; align-items: flex-start; }
+.chat-bubble {
+  display: inline-block; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5;
+  max-width: 85%;
+}
+.chat-question .chat-bubble { background: var(--navy); color: #fff; border-bottom-right-radius: 3px; }
+.chat-answer .chat-bubble { background: #eef1f5; color: var(--text); border-bottom-left-radius: 3px; }
+.chat-error .chat-bubble { background: #fdecea; color: var(--danger); border-bottom-left-radius: 3px; }
+.chat-table { margin-top: 8px; font-size: 12px; width: auto; min-width: 260px; }
+.chat-table th, .chat-table td { padding: 6px 10px; white-space: nowrap; }
+
+/* -------------------------------------------------------------------
+   Floating Assistant widget -- available on every page as a popup,
+   not a separate tab.
+-------------------------------------------------------------------- */
+.assistant-widget { position: fixed; right: 24px; bottom: 24px; z-index: 200; }
+
+.assistant-fab {
+  width: 56px; height: 56px; border-radius: 50%; border: none; background: var(--navy);
+  color: #fff; font-size: 24px; cursor: pointer; box-shadow: var(--shadow-md);
+  display: flex; align-items: center; justify-content: center; transition: transform .15s, background-color .15s;
+  margin-left: auto;
+}
+.assistant-fab:hover { transform: scale(1.06); background: var(--navy-dark); }
+
+.assistant-panel {
+  position: absolute; right: 0; bottom: 68px; width: 340px; max-height: 70vh;
+  background: var(--panel-bg); border-radius: 14px; box-shadow: var(--shadow-md);
+  display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border);
+}
+/* `display: flex` above has the same specificity as the browser's default
+   `[hidden] { display: none }` rule and wins by source order, so the panel
+   never actually hides -- this rule (higher specificity: class + attribute)
+   forces it closed when the `hidden` attribute is set. */
+.assistant-panel[hidden] { display: none; }
+.assistant-panel-header {
+  background: var(--navy); color: #fff; padding: 12px 16px; display: flex;
+  align-items: center; justify-content: space-between; font-weight: 600; font-size: 14px; flex: none;
+}
+.assistant-panel-header button {
+  background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; line-height: 1;
+  min-width: 28px; min-height: 28px; display: flex; align-items: center; justify-content: center;
+  border-radius: 6px;
+}
+.assistant-panel-header button:hover { background: rgba(255, 255, 255, .15); }
+.assistant-panel-body { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; min-height: 120px; }
+.assistant-hint { font-size: 12px; color: var(--muted); }
+.assistant-hint p { margin: 0 0 4px; font-weight: 600; color: var(--text); }
+.assistant-hint ul { margin: 0 0 0 16px; padding: 0; }
+.assistant-hint li { margin-bottom: 4px; }
+
+.assistant-builder {
+  border: 1px solid var(--border); border-radius: 8px; padding: 10px; display: flex;
+  flex-direction: column; gap: 8px; background: #f7f9fc; font-size: 12px; flex: none;
+}
+.assistant-builder label { display: flex; flex-direction: column; gap: 3px; color: var(--muted); }
+.assistant-builder select { padding: 5px 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 12px; }
+.assistant-builder-periods { display: flex; gap: 6px; }
+.assistant-builder-periods label { flex: 1; }
+
+.assistant-quick-pills { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px; border-top: 1px solid var(--border); flex: none; }
+.assistant-pill {
+  border: 1px solid var(--border); background: #fff; border-radius: 20px; padding: 6px 12px;
+  font-size: 12px; font-weight: 600; color: var(--navy); cursor: pointer; white-space: nowrap;
+  transition: border-color .15s, color .15s;
+}
+.assistant-pill:hover { border-color: var(--accent); color: var(--accent); }
+.assistant-pill-accent { background: #eef4ff; border-color: var(--accent); color: var(--accent-dark); }
+
+.assistant-input-row { display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--border); flex: none; }
+.assistant-input-row input {
+  flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: 20px; font-size: 13px; min-width: 0;
+}
+.assistant-input-row input:focus { outline: none; border-color: var(--accent); }
+.assistant-send {
+  width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--accent); color: #fff;
+  cursor: pointer; flex: none; font-size: 14px;
+}
+.assistant-send:hover { background: var(--accent-dark); }
+
+@media (max-width: 480px) {
+  .assistant-widget { right: 12px; bottom: 12px; }
+  .assistant-panel { width: calc(100vw - 24px); }
+}
+
 .view-toggle { display: flex; gap: 8px; margin-bottom: 14px; }
 .view-toggle button {
   padding: 7px 14px; border: 1px solid var(--border); background: #fff; border-radius: 20px;

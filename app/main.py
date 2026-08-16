@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse,
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app import excel_processor, mapping_engine, analysis_engine as ae, export_engine
+from app import excel_processor, mapping_engine, analysis_engine as ae, export_engine, assistant_engine
 from app.excel_processor import ExcelProcessingError
 from app.utils import store, SESSION_COOKIE
 
@@ -21,7 +21,7 @@ BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_DIR = BASE_DIR.parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-app = FastAPI(title="FTE Location Mapping & Workforce Planning Tool")
+app = FastAPI(title="OptiView — FTE Location & Workforce Planning Tool")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
@@ -199,6 +199,8 @@ async def management_page(request: Request):
     return templates.TemplateResponse("management.html", ctx)
 
 
+
+
 # ---------------------------------------------------------------------------
 # JSON APIs (consumed by static/js/app.js for live filtering)
 # ---------------------------------------------------------------------------
@@ -277,6 +279,57 @@ async def api_transfer(request: Request, from_period: str, to_period: str, categ
     return ae.identify_transfer_opportunities(dataset.long_df, filters, from_period, to_period, category)
 
 
+@app.get("/api/assistant/meta")
+async def api_assistant_meta(request: Request):
+    require_dataset(request)
+    return {
+        "questions": assistant_engine.PREDEFINED_QUESTIONS,
+        "metrics": assistant_engine.METRICS,
+    }
+
+
+@app.get("/api/assistant/ask")
+async def api_assistant_ask(
+    request: Request, question_id: str,
+    period: Optional[str] = None, from_period: Optional[str] = None, to_period: Optional[str] = None,
+):
+    dataset_id, dataset = require_dataset(request)
+    filters = parse_filters(request)
+    try:
+        result = assistant_engine.answer_predefined(question_id, dataset.long_df, filters, period, from_period, to_period)
+    except assistant_engine.AssistantError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    return build_json_safe(result)
+
+
+@app.get("/api/assistant/query")
+async def api_assistant_query(
+    request: Request, metric_id: str,
+    period: Optional[str] = None, from_period: Optional[str] = None, to_period: Optional[str] = None,
+):
+    dataset_id, dataset = require_dataset(request)
+    filters = parse_filters(request)
+    try:
+        result = assistant_engine.answer_query(metric_id, dataset.long_df, filters, period, from_period, to_period)
+    except assistant_engine.AssistantError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    return build_json_safe(result)
+
+
+@app.get("/api/assistant/freeform")
+async def api_assistant_freeform(
+    request: Request, q: str,
+    period: Optional[str] = None, from_period: Optional[str] = None, to_period: Optional[str] = None,
+):
+    dataset_id, dataset = require_dataset(request)
+    filters = parse_filters(request)
+    try:
+        result = assistant_engine.answer_freeform(q, dataset.long_df, filters, period, from_period, to_period)
+    except assistant_engine.AssistantError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    return build_json_safe(result)
+
+
 @app.get("/api/manual-mapping")
 async def list_manual_mapping(request: Request):
     dataset_id, dataset = require_dataset(request)
@@ -329,7 +382,7 @@ async def export(
     content = export_engine.build_export_workbook(
         dataset, filters, period, category, from_period, to_period, manual_mappings
     )
-    filename = "FTE_Location_Planning_Analysis.xlsx"
+    filename = "OptiView_FTE_Analysis.xlsx"
     return StreamingResponse(
         iter([content]),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

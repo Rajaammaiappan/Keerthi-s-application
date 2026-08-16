@@ -46,7 +46,14 @@ const FTE = (() => {
       }
     }
     const res = await fetch(url, { credentials: "same-origin" });
-    if (!res.ok) throw new Error(`API error ${res.status}`);
+    if (!res.ok) {
+      let message = `API error ${res.status}`;
+      try {
+        const body = await res.json();
+        if (body && body.error) message = body.error;
+      } catch (_) { /* body wasn't JSON -- keep the generic message */ }
+      throw new Error(message);
+    }
     return res.json();
   }
 
@@ -533,7 +540,205 @@ const FTE = (() => {
     loadManagementData();
   }
 
+  // -------------------------------------------------------------------
+  // Assistant widget: a floating chat popup available on every page
+  // (not a separate tab). Quick-question pills, a "Build a Question"
+  // metric picker, and a free-text box that resolves locally to a
+  // predefined question or a customer/location lookup -- no external
+  // AI/LLM call, every answer comes from the same analysis functions
+  // that power the rest of the app.
+  // -------------------------------------------------------------------
+  const widget = { period: null, fromPeriod: null, toPeriod: null };
+
+  function mdBold(text) {
+    const span = document.createElement("span");
+    span.textContent = text;
+    return span.innerHTML.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  }
+
+  function widgetFeed() { return qs("#assistant-widget-feed"); }
+
+  function clearWidgetHint() {
+    const feed = widgetFeed();
+    const hint = feed && feed.querySelector(".assistant-hint");
+    if (hint) hint.remove();
+  }
+
+  function addChatQuestion(feed, text) {
+    if (!feed) return;
+    clearWidgetHint();
+    const div = document.createElement("div");
+    div.className = "chat-entry chat-question";
+    const bubble = document.createElement("div");
+    bubble.className = "chat-bubble";
+    bubble.textContent = text;
+    div.appendChild(bubble);
+    feed.appendChild(div);
+    feed.scrollTop = feed.scrollHeight;
+  }
+
+  function addChatAnswer(feed, result) {
+    if (!feed) return;
+    const div = document.createElement("div");
+    div.className = "chat-entry chat-answer";
+    let html = `<div class="chat-bubble">${mdBold(result.summary)}</div>`;
+    if (result.table && result.table.rows.length) {
+      html += `<div class="table-scroll"><table class="data-table chat-table">
+        <thead><tr>${result.table.columns.map(c => `<th>${c}</th>`).join("")}</tr></thead>
+        <tbody>${result.table.rows.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join("")}</tr>`).join("")}</tbody>
+      </table></div>`;
+    }
+    div.innerHTML = html;
+    feed.appendChild(div);
+    feed.scrollTop = feed.scrollHeight;
+  }
+
+  function addChatError(feed, err) {
+    if (!feed) return;
+    const div = document.createElement("div");
+    div.className = "chat-entry chat-error";
+    const bubble = document.createElement("div");
+    bubble.className = "chat-bubble";
+    bubble.textContent = `⚠ ${err.message}`;
+    div.appendChild(bubble);
+    feed.appendChild(div);
+    feed.scrollTop = feed.scrollHeight;
+  }
+
+  function renderWidgetPills(questions) {
+    const el = qs("#assistant-quick-pills");
+    if (!el) return;
+    el.innerHTML = "";
+
+    const buildBtn = document.createElement("button");
+    buildBtn.type = "button";
+    buildBtn.className = "assistant-pill assistant-pill-accent";
+    buildBtn.textContent = "🧩 Build a Question";
+    buildBtn.addEventListener("click", () => {
+      const builder = qs("#assistant-builder");
+      if (builder) builder.hidden = !builder.hidden;
+    });
+    el.appendChild(buildBtn);
+
+    const shortcuts = [
+      ["🏢", "top_location", "Top Location"],
+      ["👥", "top_customer", "Top Customer"],
+      ["⚠️", "base_issues", "Base Issues"],
+      ["🔻", "releasing_capacity", "Releasing Capacity"],
+      ["📈", "growing_locations", "Growing"],
+      ["🔄", "transfer_opportunities", "Transfers"],
+      ["🥧", "category_split", "Category Split"],
+    ];
+    shortcuts.forEach(([icon, id, label]) => {
+      const q = questions.find(item => item.id === id);
+      if (!q) return;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "assistant-pill";
+      btn.textContent = `${icon} ${label}`;
+      btn.addEventListener("click", () => askWidgetPredefined(q));
+      el.appendChild(btn);
+    });
+  }
+
+  function renderWidgetBuilder(metrics, periods) {
+    const metricSel = qs("#assistant-metric-select");
+    const periodSel = qs("#assistant-period");
+    const fromSel = qs("#assistant-from-period");
+    const toSel = qs("#assistant-to-period");
+    if (!metricSel || !periodSel || !fromSel || !toSel) return;
+
+    metricSel.innerHTML = metrics.map(m => `<option value="${m.id}">${m.label}</option>`).join("");
+    [periodSel, fromSel, toSel].forEach(sel => {
+      sel.innerHTML = periods.map(p => `<option value="${p}">${p}</option>`).join("");
+    });
+    periodSel.value = widget.period;
+    fromSel.value = widget.fromPeriod;
+    toSel.value = widget.toPeriod;
+    periodSel.addEventListener("change", () => { widget.period = periodSel.value; });
+    fromSel.addEventListener("change", () => { widget.fromPeriod = fromSel.value; });
+    toSel.addEventListener("change", () => { widget.toPeriod = toSel.value; });
+
+    qs("#assistant-builder-ask").addEventListener("click", async () => {
+      const opt = metricSel.options[metricSel.selectedIndex];
+      const feed = widgetFeed();
+      addChatQuestion(feed, opt.textContent);
+      try {
+        const result = await api("/api/assistant/query", {
+          metric_id: metricSel.value, period: widget.period, from_period: widget.fromPeriod, to_period: widget.toPeriod,
+        });
+        addChatAnswer(feed, result);
+      } catch (err) {
+        addChatError(feed, err);
+      }
+    });
+  }
+
+  async function askWidgetPredefined(q) {
+    const feed = widgetFeed();
+    addChatQuestion(feed, q.label);
+    try {
+      const result = await api("/api/assistant/ask", {
+        question_id: q.id, period: widget.period, from_period: widget.fromPeriod, to_period: widget.toPeriod,
+      });
+      addChatAnswer(feed, result);
+    } catch (err) {
+      addChatError(feed, err);
+    }
+  }
+
+  async function askWidgetFreeform(text) {
+    const feed = widgetFeed();
+    addChatQuestion(feed, text);
+    try {
+      const result = await api("/api/assistant/freeform", {
+        q: text, period: widget.period, from_period: widget.fromPeriod, to_period: widget.toPeriod,
+      });
+      addChatAnswer(feed, result);
+    } catch (err) {
+      addChatError(feed, err);
+    }
+  }
+
+  function toggleWidgetPanel(show) {
+    const panel = qs("#assistant-panel");
+    if (panel) panel.hidden = !show;
+  }
+
+  async function initAssistantWidget() {
+    const root = qs("#assistant-widget");
+    if (!root) return;
+
+    let meta, assistantMeta;
+    try {
+      meta = await api("/api/meta");
+      assistantMeta = await api("/api/assistant/meta");
+    } catch (_) {
+      root.hidden = true; // no dataset loaded on this page yet
+      return;
+    }
+
+    widget.period = meta.periods[meta.periods.length - 1] || null;
+    widget.fromPeriod = meta.periods[0] || null;
+    widget.toPeriod = meta.periods[meta.periods.length - 1] || null;
+
+    root.hidden = false;
+    renderWidgetPills(assistantMeta.questions);
+    renderWidgetBuilder(assistantMeta.metrics, meta.periods);
+
+    qs("#assistant-fab").addEventListener("click", () => toggleWidgetPanel(true));
+    qs("#assistant-close").addEventListener("click", () => toggleWidgetPanel(false));
+    qs("#assistant-input-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const input = qs("#assistant-input");
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = "";
+      askWidgetFreeform(text);
+    });
+  }
+
   return {
-    initDashboard, initMapping, initAnalysis, initTransfer, initManagement,
+    initDashboard, initMapping, initAnalysis, initTransfer, initManagement, initAssistantWidget,
   };
 })();
