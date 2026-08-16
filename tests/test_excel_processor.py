@@ -60,6 +60,51 @@ def test_process_workbook_missing_required_column(tmp_path):
         process_workbook(path, "bad.xlsx")
 
 
+def test_process_workbook_two_row_header_format(tmp_path):
+    """The standard 'FTE_Location_Planner' template: row 1 has the period
+    label merged across 5 columns, row 2 has Internal/SWC/External/Others
+    and the repeated period total."""
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "FTE_Data"
+
+    headers_row1 = [
+        "S.No", "VM Product", "Customer Account", "Component", "Country",
+        "Location", "Base location", "FTE_Dec_2025", None, None, None, None,
+    ]
+    headers_row2 = [
+        None, None, None, None, None, None, None,
+        "Internal", "SWC", "External", "Others", "FTE_Dec_2025",
+    ]
+    ws.append(headers_row1)
+    ws.append(headers_row2)
+    ws.merge_cells("A1:A2")
+    ws.merge_cells("B1:B2")
+    ws.merge_cells("C1:C2")
+    ws.merge_cells("D1:D2")
+    ws.merge_cells("E1:E2")
+    ws.merge_cells("F1:F2")
+    ws.merge_cells("G1:G2")
+    ws.merge_cells("H1:L1")
+    ws.append([1, "BS/OSS/ST", "Ford", "NET/DCOM", "India", "Ban", "No", 10, 5, 3, 0, 18])
+    ws.append([2, "BS/OSS/ST", "Ford", "NET/DCOM", "India", "Cob", "Yes", 12, 7, 5, 0, 24])
+
+    path = tmp_path / "two_row_header.xlsx"
+    wb.save(path)
+
+    dataset = process_workbook(path, "two_row_header.xlsx")
+    assert dataset.periods == ["Dec-2025"]
+    assert set(dataset.categories) == {"Internal", "SWC", "External", "Others", "Total"}
+    assert set(dataset.dims["Customer_Account"]) == {"Ford"}
+
+    totals = dataset.long_df[
+        (dataset.long_df["Category"] == "Total") & (dataset.long_df["Location"] == "Ban")
+    ]
+    assert totals["FTE"].iloc[0] == 18
+
+
 def test_process_workbook_end_to_end(tmp_path):
     df = pd.DataFrame({
         "S.No": [1, 2, 3],

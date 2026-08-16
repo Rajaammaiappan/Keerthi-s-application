@@ -12,7 +12,6 @@ from fastapi.templating import Jinja2Templates
 
 from app import excel_processor, mapping_engine, analysis_engine as ae, export_engine
 from app.excel_processor import ExcelProcessingError
-from app.sample_data import generate_sample_workbook
 from app.utils import store, SESSION_COOKIE
 
 logging.basicConfig(level=logging.INFO)
@@ -112,24 +111,6 @@ async def upload(request: Request, file: UploadFile = File(...)):
         }, status_code=500)
     finally:
         tmp_path.unlink(missing_ok=True)
-
-    dataset_id = store.new_id()
-    store.put(dataset_id, dataset)
-    _manual_mappings[dataset_id] = []
-
-    response = RedirectResponse(url="/dashboard", status_code=303)
-    response.set_cookie(SESSION_COOKIE, dataset_id, max_age=60 * 60 * 8)
-    return response
-
-
-@app.get("/use-sample")
-async def use_sample():
-    from io import BytesIO
-    contents = generate_sample_workbook()
-    tmp_path = UPLOAD_DIR / f"{uuid.uuid4().hex}.xlsx"
-    tmp_path.write_bytes(contents)
-    dataset = excel_processor.process_workbook(tmp_path, "sample_demo_data.xlsx")
-    tmp_path.unlink(missing_ok=True)
 
     dataset_id = store.new_id()
     store.put(dataset_id, dataset)
@@ -339,16 +320,6 @@ async def export(
         iter([content]),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
-
-
-@app.get("/download-sample")
-async def download_sample():
-    content = generate_sample_workbook()
-    return StreamingResponse(
-        iter([content]),
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": 'attachment; filename="sample_fte_data.xlsx"'},
     )
 
 

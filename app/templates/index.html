@@ -19,28 +19,26 @@
   <form id="upload-form" action="/upload" method="post" enctype="multipart/form-data">
     <label for="file-input" class="dropzone" id="dropzone">
       <input type="file" id="file-input" name="file" accept=".xlsx,.xls" required>
+      <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 4v11m0-11 4 4m-4-4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M4 16v2.5A2.5 2.5 0 0 0 6.5 21h11a2.5 2.5 0 0 0 2.5-2.5V16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
       <div class="dropzone-text">
         <span class="dropzone-title">Drag &amp; drop your Excel file here</span>
         <span class="dropzone-sub">or click to browse (.xlsx, .xls)</span>
         <span class="dropzone-filename" id="dropzone-filename"></span>
       </div>
     </label>
-    <button type="submit" class="btn btn-primary">Upload &amp; Analyze</button>
+    <button type="submit" class="btn btn-primary btn-block">Upload &amp; Analyze</button>
   </form>
 
-  <div class="sample-row">
-    <span>No file handy?</span>
-    <a href="/use-sample" class="btn btn-secondary">Try with Sample Data</a>
-    <a href="/download-sample" class="btn btn-link">Download Sample Excel</a>
-  </div>
-
   <div class="info-box">
-    <h3>Expected columns (any order, flexible naming)</h3>
+    <h3>Expected columns</h3>
     <p>S.No, VM Product, Customer Account, Component, Country, Location, Base location,
-      and per-period FTE columns such as <code>FTE_Dec_2025</code>,
-      <code>FTE_Dec_2025_Internal</code>, <code>FTE_Dec_2025_SWC</code>,
-      <code>FTE_Dec_2025_External</code>, <code>FTE_Dec_2025_Others</code>.
-      Any number of periods and categories is supported automatically.</p>
+      and per-period FTE columns broken down as
+      <code>Internal</code>, <code>SWC</code>, <code>External</code>, <code>Others</code>,
+      and the period total. Any number of periods, categories, and locations is
+      detected automatically — column order doesn't matter.</p>
   </div>
 </section>
 {% endblock %}

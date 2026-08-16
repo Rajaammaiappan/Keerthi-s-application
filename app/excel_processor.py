@@ -26,27 +26,99 @@ class ExcelProcessingError(Exception):
     """Raised for any problem that should surface as a friendly error page."""
 
 
+# Some workbooks (e.g. the standard "FTE_Location_Planner" template) use a
+# two-row header: row 1 has the period label merged across a group of
+# columns (e.g. "FTE_Dec_2025" spanning 5 columns), row 2 has the
+# per-column breakdown ("Internal", "SWC", "External", "Others", and the
+# period's own total repeated). Plain pandas can't read that directly, so
+# it's flattened here into single-row headers like "FTE_Dec_2025_Internal"
+# that `parse_fte_column` already understands.
+CATEGORY_HEADER_ALIASES = {"internal", "swc", "external", "others", "other"}
+
+
+def _looks_like_two_row_header(raw: pd.DataFrame) -> bool:
+    """True if row 2 (index 1) looks like Internal/SWC/External/Others sub-headers."""
+    if len(raw) < 3:
+        return False
+    row2 = raw.iloc[1]
+    matches = sum(
+        1 for v in row2
+        if isinstance(v, str) and v.strip().lower() in CATEGORY_HEADER_ALIASES
+    )
+    return matches >= 2
+
+
+def _flatten_two_row_header(raw: pd.DataFrame) -> pd.DataFrame:
+    row1 = list(raw.iloc[0])
+    row2 = list(raw.iloc[1])
+
+    # Excel merged cells only store a value in the top-left cell of the
+    # range; the rest read back as NaN. Forward-fill row 1 so every column
+    # in a merged period group picks up that group's label.
+    filled_row1 = []
+    last = None
+    for v in row1:
+        if v is None or (isinstance(v, float) and pd.isna(v)) or str(v).strip() == "":
+            filled_row1.append(last)
+        else:
+            last = v
+            filled_row1.append(v)
+
+    combined = []
+    for top, sub in zip(filled_row1, row2):
+        if sub is not None and not (isinstance(sub, float) and pd.isna(sub)) and str(sub).strip() != "":
+            sub_text = str(sub).strip()
+            if sub_text.lower() in CATEGORY_HEADER_ALIASES:
+                combined.append(f"{top}_{sub_text}")
+            else:
+                # The group's total sub-header repeats the period label
+                # itself (e.g. "FTE_Dec_2025") -- use it as-is.
+                combined.append(sub_text)
+        else:
+            combined.append(top)
+
+    data = raw.iloc[2:].reset_index(drop=True)
+    data.columns = [str(c).strip() if c is not None else "" for c in combined]
+    return data
+
+
+def _read_sheet(xls_or_path, sheet_name=None, engine: str | None = None) -> pd.DataFrame:
+    kwargs = {"header": None}
+    if sheet_name is not None:
+        kwargs["sheet_name"] = sheet_name
+    if engine is not None:
+        kwargs["engine"] = engine
+    raw = pd.read_excel(xls_or_path, **kwargs)
+    if _looks_like_two_row_header(raw):
+        return _flatten_two_row_header(raw)
+
+    header_kwargs = {k: v for k, v in kwargs.items() if k != "header"}
+    return pd.read_excel(xls_or_path, **header_kwargs)
+
+
 def _read_workbook(path: Path) -> pd.DataFrame:
     try:
         if path.suffix.lower() == ".xls":
-            df = pd.read_excel(path, engine="xlrd")
+            df = _read_sheet(path, engine="xlrd")
         else:
             # Pick the first sheet that actually looks like tabular data
-            # (more than 1 column, header row present).
-            xls = pd.ExcelFile(path)
-            best_sheet = None
-            best_cols = -1
-            for name in xls.sheet_names:
-                try:
-                    preview = pd.read_excel(xls, sheet_name=name, nrows=5)
-                except Exception:
-                    continue
-                if preview.shape[1] > best_cols and preview.shape[1] > 2:
-                    best_cols = preview.shape[1]
-                    best_sheet = name
-            if best_sheet is None:
-                best_sheet = xls.sheet_names[0]
-            df = pd.read_excel(xls, sheet_name=best_sheet)
+            # (more than 1 column, header row present). The `with` here
+            # matters on Windows: an unclosed ExcelFile keeps the temp
+            # upload locked, so the caller's later os.unlink() fails.
+            with pd.ExcelFile(path) as xls:
+                best_sheet = None
+                best_cols = -1
+                for name in xls.sheet_names:
+                    try:
+                        preview = pd.read_excel(xls, sheet_name=name, nrows=5)
+                    except Exception:
+                        continue
+                    if preview.shape[1] > best_cols and preview.shape[1] > 2:
+                        best_cols = preview.shape[1]
+                        best_sheet = name
+                if best_sheet is None:
+                    best_sheet = xls.sheet_names[0]
+                df = _read_sheet(xls, sheet_name=best_sheet)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed reading workbook")
         raise ExcelProcessingError("File is corrupted or not a valid Excel file") from exc

@@ -44,7 +44,6 @@ everything is detected dynamically from whatever Excel file is uploaded.
   Released Capacity)
 - Automatic transfer-opportunity matching + manual mapping entry
 - One-click download of a multi-sheet analyzed Excel report
-- Built-in sample-data generator so you can try the app without your own file
 
 ## Project structure
 
@@ -57,7 +56,6 @@ fte-location-planner/
 │   ├── mapping_engine.py     # Filters, base-location logic, matrix builder
 │   ├── analysis_engine.py    # Summaries, comparison, capacity, transfers
 │   ├── export_engine.py      # Builds the downloadable analyzed workbook
-│   ├── sample_data.py        # Demo dataset generator
 │   ├── utils.py              # Column matching, normalization, session store
 │   ├── templates/            # Jinja2 HTML templates
 │   └── static/                # CSS + vanilla JS
@@ -99,9 +97,6 @@ Open:
 http://127.0.0.1:8000
 ```
 
-Click **"Try with Sample Data"** on the home page to explore the app
-immediately without uploading anything.
-
 ## Running tests
 
 ```bash
@@ -139,6 +134,13 @@ FTE_<Month>_<Year>_Others | FTE_<Month>_<Year>
 
 Any number of periods, categories, locations, and customer accounts is
 supported — nothing is hard-coded.
+
+**Two-row header template is also supported.** The standard
+`FTE_Location_Planner` template merges the period label across a group of
+columns on row 1 (e.g. `FTE_Dec_2025` spanning 5 columns) and puts the
+`Internal | SWC | External | Others | <period total>` sub-headers on row 2.
+The app detects this layout automatically and flattens it before parsing —
+no manual conversion needed.
 
 ## Notes on data storage
 
