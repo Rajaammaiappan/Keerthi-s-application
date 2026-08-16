@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Upload | FTE Location Planner{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>Upload Workforce / FTE Excel</h1>
+  <p class="subtitle">
+    Upload your workforce/FTE tracking Excel file. The tool will automatically detect
+    customer accounts, locations, base locations, and FTE periods/categories, then build
+    a Location Mapping Matrix and workforce planning dashboard.
+  </p>
+
+  {% if has_dataset %}
+  <div class="notice">
+    A dataset is already loaded (<strong>{{ filename }}</strong>).
+    <a href="/dashboard">Go to Dashboard →</a>
+  </div>
+  {% endif %}
+
+  <form id="upload-form" action="/upload" method="post" enctype="multipart/form-data">
+    <label for="file-input" class="dropzone" id="dropzone">
+      <input type="file" id="file-input" name="file" accept=".xlsx,.xls" required>
+      <div class="dropzone-text">
+        <span class="dropzone-title">Drag &amp; drop your Excel file here</span>
+        <span class="dropzone-sub">or click to browse (.xlsx, .xls)</span>
+        <span class="dropzone-filename" id="dropzone-filename"></span>
+      </div>
+    </label>
+    <button type="submit" class="btn btn-primary">Upload &amp; Analyze</button>
+  </form>
+
+  <div class="sample-row">
+    <span>No file handy?</span>
+    <a href="/use-sample" class="btn btn-secondary">Try with Sample Data</a>
+    <a href="/download-sample" class="btn btn-link">Download Sample Excel</a>
+  </div>
+
+  <div class="info-box">
+    <h3>Expected columns (any order, flexible naming)</h3>
+    <p>S.No, VM Product, Customer Account, Component, Country, Location, Base location,
+      and per-period FTE columns such as <code>FTE_Dec_2025</code>,
+      <code>FTE_Dec_2025_Internal</code>, <code>FTE_Dec_2025_SWC</code>,
+      <code>FTE_Dec_2025_External</code>, <code>FTE_Dec_2025_Others</code>.
+      Any number of periods and categories is supported automatically.</p>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+const dz = document.getElementById('dropzone');
+const input = document.getElementById('file-input');
+const nameLabel = document.getElementById('dropzone-filename');
+input.addEventListener('change', () => {
+  nameLabel.textContent = input.files.length ? input.files[0].name : '';
+});
+['dragover','dragenter'].forEach(evt => dz.addEventListener(evt, e => { e.preventDefault(); dz.classList.add('dragover'); }));
+['dragleave','drop'].forEach(evt => dz.addEventListener(evt, e => { e.preventDefault(); dz.classList.remove('dragover'); }));
+dz.addEventListener('drop', e => {
+  if (e.dataTransfer.files.length) {
+    input.files = e.dataTransfer.files;
+    nameLabel.textContent = input.files[0].name;
+  }
+});
+</script>
+{% endblock %}

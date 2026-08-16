@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}FTE Analysis | FTE Location Planner{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div>
+    <h1>FTE Analysis</h1>
+    <p class="subtitle">Compare periods and view location capacity/demand.</p>
+  </div>
+  <a href="#" id="export-link" class="btn btn-primary">Download Analyzed Report (.xlsx)</a>
+</section>
+
+<section id="filter-bar" class="filter-bar" data-periods='{{ periods|tojson }}' data-categories='{{ categories|tojson }}' data-dims='{{ dims|tojson }}'></section>
+
+<section class="compare-bar">
+  <label>From Period
+    <select id="from-period"></select>
+  </label>
+  <label>To Period
+    <select id="to-period"></select>
+  </label>
+</section>
+
+<section class="panel">
+  <h2>Period Comparison</h2>
+  <div class="table-scroll"><table id="comparison-table" class="data-table"></table></div>
+</section>
+
+<section class="panel">
+  <h2>Location Capacity / Demand</h2>
+  <div class="table-scroll"><table id="capacity-table" class="data-table"></table></div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>document.addEventListener('DOMContentLoaded', () => FTE.initAnalysis());</script>
+{% endblock %}

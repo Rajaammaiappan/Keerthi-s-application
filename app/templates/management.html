@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Management View | FTE Location Planner{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div><h1>Management View</h1><p class="subtitle">High-level summary — no technical detail.</p></div>
+  <a href="#" id="export-link" class="btn btn-primary">Download Report</a>
+</section>
+
+<section id="filter-bar" class="filter-bar" data-periods='{{ periods|tojson }}' data-categories='{{ categories|tojson }}' data-dims='{{ dims|tojson }}' data-simple="1"></section>
+
+<section class="summary-cards" id="summary-cards"></section>
+
+<section class="grid-2">
+  <div class="panel">
+    <h2>Location Distribution</h2>
+    <div class="table-scroll"><table id="location-summary-table" class="data-table"></table></div>
+  </div>
+  <div class="panel">
+    <h2>Customer Distribution</h2>
+    <div class="table-scroll"><table id="customer-summary-table" class="data-table"></table></div>
+  </div>
+</section>
+
+<section class="compare-bar">
+  <label>From Period<select id="from-period"></select></label>
+  <label>To Period<select id="to-period"></select></label>
+</section>
+
+<section class="panel">
+  <h2>FTE Growth / Reduction</h2>
+  <div class="table-scroll"><table id="comparison-table" class="data-table"></table></div>
+</section>
+
+<section class="panel">
+  <h2>Top Potential Transfer Opportunities</h2>
+  <div class="table-scroll"><table id="transfer-table" class="data-table"></table></div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>document.addEventListener('DOMContentLoaded', () => FTE.initManagement());</script>
+{% endblock %}
