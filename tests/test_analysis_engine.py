@@ -19,6 +19,29 @@ def _long_df():
     return pd.DataFrame(rows)
 
 
+def _long_df_with_categories():
+    rows = []
+    for loc, cat, fte in [
+        ("Ban", "Internal", 14), ("Ban", "SWC", 1), ("Ban", "External", 3), ("Ban", "Others", 0),
+        ("Cob", "Internal", 5), ("Cob", "SWC", 2), ("Cob", "External", 1), ("Cob", "Others", 0),
+    ]:
+        rows.append({"_row_id": f"{loc}-{cat}", "Customer_Account": "Airbus", "Location": loc,
+                      "Base_Location_Flag": True, "Period": "Dec-2025", "Category": cat, "FTE": fte,
+                      "VM_Product": "A", "Component": "C1", "Country": "IN"})
+    return pd.DataFrame(rows)
+
+
+def test_category_breakdown_totals_and_by_location():
+    long_df = _long_df_with_categories()
+    result = ae.category_breakdown(long_df, {}, "Dec-2025")
+    assert result["categories"] == ["Internal", "SWC", "External", "Others"]
+    by_cat = {d["category"]: d["fte"] for d in result["by_category"]}
+    assert by_cat == {"Internal": 19.0, "SWC": 3.0, "External": 4.0, "Others": 0.0}
+    by_loc = {d["location"]: d for d in result["by_location"]}
+    assert by_loc["Ban"]["total"] == 18.0
+    assert by_loc["Cob"]["total"] == 8.0
+
+
 def test_period_comparison_classifies_reduction_and_growth():
     long_df = _long_df()
     rows = ae.period_comparison(long_df, {}, "Dec-2025", "Jun-2026", "Total")

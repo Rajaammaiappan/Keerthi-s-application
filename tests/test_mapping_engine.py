@@ -5,7 +5,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pandas as pd
 
-from app.mapping_engine import build_matrix, base_location_status, customer_base_warnings
+from app.mapping_engine import (
+    build_matrix, build_matrix_breakdown, base_location_status, customer_base_warnings,
+)
 
 
 def _long_df():
@@ -23,6 +25,14 @@ def _long_df():
         {"_row_id": 5, "Customer_Account": "JLR", "Location": "Ban", "Base_Location_Flag": True,
          "Period": "Dec-2025", "Category": "Total", "FTE": 2, "VM_Product": "A", "Component": "C1", "Country": "IN"},
     ])
+
+
+def _long_df_with_categories():
+    rows = []
+    for cat, fte in [("Internal", 14), ("SWC", 1), ("External", 3), ("Others", 0)]:
+        rows.append({"_row_id": 1, "Customer_Account": "Airbus", "Location": "Ban", "Base_Location_Flag": True,
+                      "Period": "Dec-2025", "Category": cat, "FTE": fte, "VM_Product": "A", "Component": "C1", "Country": "IN"})
+    return pd.DataFrame(rows)
 
 
 def test_base_location_status_and_warnings():
@@ -50,3 +60,13 @@ def test_build_matrix_respects_filters():
     long_df = _long_df()
     matrix = build_matrix(long_df, filters={"Customer_Account": ["Ford"]}, period="Dec-2025", category="Total")
     assert matrix["customers"] == ["Ford"]
+
+
+def test_build_matrix_breakdown_composes_categories_to_total():
+    long_df = _long_df_with_categories()
+    matrix = build_matrix_breakdown(long_df, filters={}, period="Dec-2025")
+    assert matrix["categories"] == ["Internal", "SWC", "External", "Others"]
+    cell = matrix["cells"]["Airbus"]["Ban"]
+    assert cell["values"] == {"Internal": 14.0, "SWC": 1.0, "External": 3.0, "Others": 0.0}
+    assert cell["total"] == 18.0
+    assert cell["is_base"] is True

@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import pandas as pd
 
+from app.models import CANONICAL_CATEGORIES
+
 FILTERABLE_DIMS = ["VM_Product", "Customer_Account", "Component", "Country", "Location"]
 
 
@@ -104,6 +106,67 @@ def build_matrix(long_df: pd.DataFrame, filters: dict, period: str, category: st
     return {
         "customers": customers,
         "locations": locations,
+        "cells": cells,
+        "customer_warnings": warnings,
+    }
+
+
+def build_matrix_breakdown(long_df: pd.DataFrame, filters: dict, period: str) -> dict:
+    """
+    Like build_matrix, but instead of one FTE number per cell, returns the
+    full Internal/SWC/External/Others composition (whichever of those the
+    workbook actually has) so the UI can render e.g. "14 + 1 + 3 + 0 = 18"
+    with each number color-coded by category.
+
+    Returns:
+    {
+      "customers": [...],
+      "locations": [...],
+      "categories": [...],  # subset of CANONICAL_CATEGORIES present in the data
+      "cells": {customer: {location: {"values": {cat: fte}, "total": float,
+                                       "is_base": bool, "has_fte": bool}}},
+      "customer_warnings": {customer: str|None},
+    }
+    """
+    filtered = apply_filters(long_df, filters)
+
+    base_status = base_location_status(filtered)
+    warnings = customer_base_warnings(base_status)
+
+    period_df = filtered[filtered["Period"] == period] if period else filtered.iloc[0:0]
+    cat_df = period_df[period_df["Category"].isin(CANONICAL_CATEGORIES)]
+    present_categories = [c for c in CANONICAL_CATEGORIES if c in set(cat_df["Category"])]
+
+    grouped = (
+        cat_df.groupby(["Customer_Account", "Location", "Category"])["FTE"].sum()
+    )
+
+    customers = sorted(filtered["Customer_Account"].dropna().unique().tolist())
+    locations = sorted(filtered["Location"].dropna().unique().tolist())
+    base_lookup = {(r.Customer_Account, r.Location): r.is_base for r in base_status.itertuples()}
+
+    cells: dict = {}
+    for cust in customers:
+        cells[cust] = {}
+        for loc in locations:
+            values = {}
+            for cat in present_categories:
+                try:
+                    values[cat] = float(grouped.loc[(cust, loc, cat)])
+                except KeyError:
+                    values[cat] = 0.0
+            total = sum(values.values())
+            cells[cust][loc] = {
+                "values": values,
+                "total": total,
+                "is_base": base_lookup.get((cust, loc), False),
+                "has_fte": total != 0,
+            }
+
+    return {
+        "customers": customers,
+        "locations": locations,
+        "categories": present_categories,
         "cells": cells,
         "customer_warnings": warnings,
     }

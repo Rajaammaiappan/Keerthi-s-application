@@ -221,6 +221,20 @@ async def api_matrix(request: Request, period: str, category: str = "Total"):
     return build_json_safe(mapping_engine.build_matrix(dataset.long_df, filters, period, category))
 
 
+@app.get("/api/matrix-breakdown")
+async def api_matrix_breakdown(request: Request, period: str):
+    dataset_id, dataset = require_dataset(request)
+    filters = parse_filters(request)
+    return build_json_safe(mapping_engine.build_matrix_breakdown(dataset.long_df, filters, period))
+
+
+@app.get("/api/category-breakdown")
+async def api_category_breakdown(request: Request, period: str):
+    dataset_id, dataset = require_dataset(request)
+    filters = parse_filters(request)
+    return build_json_safe(ae.category_breakdown(dataset.long_df, filters, period))
+
+
 @app.get("/api/summary")
 async def api_summary(request: Request, period: str, category: str = "Total"):
     dataset_id, dataset = require_dataset(request)

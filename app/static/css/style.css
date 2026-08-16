@@ -15,6 +15,13 @@
   --support-bg: #e7f0ff;
   --shadow-sm: 0 1px 2px rgba(20, 30, 60, 0.06);
   --shadow-md: 0 4px 14px rgba(20, 30, 60, 0.08);
+  /* FTE category colors -- shared by the pie chart, bar chart, matrix
+     breakdown cells and every legend, so a category always reads the
+     same color everywhere in the app. */
+  --cat-internal: #2f6fed;
+  --cat-swc: #8b5cf6;
+  --cat-external: #f59e0b;
+  --cat-others: #64748b;
 }
 
 * { box-sizing: border-box; }
@@ -134,6 +141,48 @@ tbody tr:hover { background: #f7f9fc; }
 .matrix-table td.negative-cell { background: #fbe3e0; color: var(--danger); font-weight: 700; text-align: center; }
 .matrix-table td.fte-sub { display: block; font-size: 11px; font-weight: 400; color: var(--muted); }
 .matrix-table th.customer-col-warn { color: var(--danger); }
+
+.matrix-table td.breakdown-cell { text-align: center; padding: 6px 8px; }
+.breakdown-line { white-space: nowrap; font-size: 12px; font-weight: 700; }
+.breakdown-line .op { color: var(--muted); font-weight: 400; margin: 0 2px; }
+.breakdown-total { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.breakdown-total strong { color: var(--text); }
+
+/* -------------------------------------------------------------------
+   Category legend -- reused by the matrix breakdown view and the
+   Dashboard charts so Internal/SWC/External/Others always map to the
+   same swatch wherever they appear.
+-------------------------------------------------------------------- */
+.category-legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--text); margin-top: 12px; }
+.category-legend .legend-item { display: flex; align-items: center; gap: 6px; }
+.category-legend .legend-swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+
+/* -------------------------------------------------------------------
+   Charts -- hand-rolled SVG/CSS, no charting library.
+-------------------------------------------------------------------- */
+.chart-empty { color: var(--muted); font-size: 13px; padding: 20px 0; text-align: center; }
+
+.pie-chart-wrap { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+.pie-chart { width: 160px; height: 160px; flex: none; }
+.pie-chart-center {
+  position: relative; margin-left: -160px; width: 160px; height: 160px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  pointer-events: none;
+}
+.pie-chart-center .pie-total { font-size: 20px; font-weight: 700; color: var(--navy); }
+.pie-chart-center .pie-total-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.pie-chart-legend { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.pie-chart-legend .legend-item { display: flex; align-items: center; gap: 8px; }
+.pie-chart-legend .legend-swatch { width: 11px; height: 11px; border-radius: 3px; flex: none; }
+.pie-chart-legend .legend-value { margin-left: auto; font-weight: 600; color: var(--text); padding-left: 12px; }
+.pie-chart-legend .legend-pct { color: var(--muted); font-size: 11px; width: 40px; text-align: right; }
+
+.bar-chart { display: flex; flex-direction: column; gap: 10px; }
+.bar-row { display: grid; grid-template-columns: 70px 1fr 44px; align-items: center; gap: 10px; }
+.bar-label { font-size: 12px; color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-track { display: flex; height: 16px; background: #eef1f5; border-radius: 4px; overflow: hidden; }
+.bar-seg { height: 100%; transition: width .2s; }
+.bar-total { font-size: 12px; color: var(--muted); text-align: right; }
 
 .view-toggle { display: flex; gap: 8px; margin-bottom: 14px; }
 .view-toggle button {

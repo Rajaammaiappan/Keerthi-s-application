@@ -10,6 +10,16 @@ const FTE = (() => {
     Location: "Location",
   };
 
+  // Fixed color per FTE category, used consistently by the pie chart, bar
+  // chart, matrix breakdown cells, and every legend.
+  const CATEGORY_COLORS = {
+    Internal: "#2f6fed",
+    SWC: "#8b5cf6",
+    External: "#f59e0b",
+    Others: "#64748b",
+  };
+  function categoryColor(cat) { return CATEGORY_COLORS[cat] || "#94a3b8"; }
+
   const state = {
     periods: [],
     categories: [],
@@ -182,6 +192,126 @@ const FTE = (() => {
   }
 
   // -------------------------------------------------------------------
+  // Matrix breakdown view (Internal + SWC + External + Others = Total,
+  // color-coded per category)
+  // -------------------------------------------------------------------
+  function renderMatrixBreakdown(matrix) {
+    const table = qs("#matrix-table");
+    const legendEl = qs("#matrix-category-legend");
+    if (!table) return;
+    if (!matrix.customers.length || !matrix.locations.length) {
+      table.innerHTML = "<tr><td>No data for the current filters.</td></tr>";
+      if (legendEl) legendEl.innerHTML = "";
+      return;
+    }
+    if (!matrix.categories.length) {
+      table.innerHTML = "<tr><td>This workbook has no Internal/SWC/External/Others breakdown — only period totals.</td></tr>";
+      if (legendEl) legendEl.innerHTML = "";
+      return;
+    }
+
+    let html = "<thead><tr><th>Customer Account</th>";
+    matrix.locations.forEach(loc => { html += `<th>${loc}</th>`; });
+    html += "</tr></thead><tbody>";
+
+    matrix.customers.forEach(cust => {
+      const warning = matrix.customer_warnings[cust];
+      const custLabel = warning ? `⚠ ${cust}` : cust;
+      html += `<tr><th class="${warning ? 'customer-col-warn' : ''}" title="${warning || ''}">${custLabel}</th>`;
+      matrix.locations.forEach(loc => {
+        const cell = matrix.cells[cust][loc];
+        html += renderBreakdownCell(cell, matrix.categories);
+      });
+      html += "</tr>";
+    });
+    html += "</tbody>";
+    table.innerHTML = html;
+    if (legendEl) legendEl.innerHTML = renderCategoryLegend(matrix.categories);
+  }
+
+  function renderBreakdownCell(cell, categories) {
+    if (!cell.has_fte) return `<td class="empty-cell">-</td>`;
+
+    const isNegative = cell.total < 0;
+    const parts = categories
+      .map(cat => `<span style="color:${categoryColor(cat)}">${cell.values[cat]}</span>`)
+      .join('<span class="op">+</span>');
+    const cls = isNegative ? "negative-cell" : cell.is_base ? "base-cell" : "support-cell";
+    return `<td class="${cls} breakdown-cell">
+      <div class="breakdown-line">${parts}</div>
+      <div class="breakdown-total">= <strong>${cell.total}</strong></div>
+    </td>`;
+  }
+
+  function renderCategoryLegend(categories) {
+    if (!categories.length) return "";
+    return `<div class="category-legend">${categories.map(cat =>
+      `<span class="legend-item"><span class="legend-swatch" style="background:${categoryColor(cat)}"></span>${cat}</span>`
+    ).join("")}</div>`;
+  }
+
+  // -------------------------------------------------------------------
+  // Charts (hand-rolled SVG/CSS -- no charting library dependency)
+  // -------------------------------------------------------------------
+  function renderCategoryPie(elId, breakdown) {
+    const el = qs(elId);
+    if (!el) return;
+    const data = (breakdown.by_category || []).filter(d => d.fte > 0);
+    const total = data.reduce((s, d) => s + d.fte, 0);
+    if (!data.length || total <= 0) {
+      el.innerHTML = '<div class="chart-empty">No category breakdown for the current filters.</div>';
+      return;
+    }
+
+    const cx = 80, cy = 80, r = 78, hole = 46;
+    let angle = -90;
+    let slices = "";
+    data.forEach(d => {
+      const frac = d.fte / total;
+      const sweep = Math.max(frac * 360, 0.001);
+      const a1 = angle * Math.PI / 180;
+      const a2 = (angle + sweep) * Math.PI / 180;
+      const x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
+      const x2 = cx + r * Math.cos(a2), y2 = cy + r * Math.sin(a2);
+      const largeArc = sweep > 180 ? 1 : 0;
+      slices += `<path d="M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${largeArc} 1 ${x2.toFixed(2)},${y2.toFixed(2)} Z" fill="${categoryColor(d.category)}"><title>${d.category}: ${d.fte} (${(frac * 100).toFixed(1)}%)</title></path>`;
+      angle += sweep;
+    });
+    const svg = `<svg viewBox="0 0 160 160" class="pie-chart">${slices}<circle cx="${cx}" cy="${cy}" r="${hole}" fill="var(--panel-bg)" /></svg>`;
+    const center = `<div class="pie-chart-center"><div class="pie-total">${Math.round(total)}</div><div class="pie-total-label">Total FTE</div></div>`;
+    const legend = `<div class="pie-chart-legend">${data.map(d =>
+      `<span class="legend-item"><span class="legend-swatch" style="background:${categoryColor(d.category)}"></span>${d.category}<span class="legend-pct">${((d.fte / total) * 100).toFixed(0)}%</span><span class="legend-value">${d.fte}</span></span>`
+    ).join("")}</div>`;
+    el.innerHTML = `<div class="pie-chart-wrap">${svg}${center}${legend}</div>`;
+  }
+
+  function renderLocationBar(elId, breakdown) {
+    const el = qs(elId);
+    if (!el) return;
+    const categories = breakdown.categories || [];
+    const rows = breakdown.by_location || [];
+    if (!categories.length || !rows.length) {
+      el.innerHTML = '<div class="chart-empty">No category breakdown for the current filters.</div>';
+      return;
+    }
+    const maxTotal = Math.max(...rows.map(r => r.total), 1);
+    const barRows = rows.map(r => {
+      const segs = categories.map(cat => {
+        const val = r[cat] || 0;
+        if (val <= 0) return "";
+        const pct = (val / maxTotal) * 100;
+        return `<div class="bar-seg" style="width:${pct}%;background:${categoryColor(cat)}" title="${cat}: ${val}"></div>`;
+      }).join("");
+      return `<div class="bar-row">
+        <div class="bar-label" title="${r.location}">${r.location}</div>
+        <div class="bar-track">${segs}</div>
+        <div class="bar-total">${r.total}</div>
+      </div>`;
+    }).join("");
+    el.innerHTML = `<div class="bar-chart">${barRows}</div>${renderCategoryLegend(categories)}`;
+  }
+
+  // -------------------------------------------------------------------
   // Generic table renderers
   // -------------------------------------------------------------------
   function renderSummaryCards(summary) {
@@ -296,22 +426,32 @@ const FTE = (() => {
   // Page loaders
   // -------------------------------------------------------------------
   async function loadDashboardData() {
-    const [summary, matrix, locSummary, custSummary] = await Promise.all([
+    const [summary, matrix, locSummary, custSummary, breakdown] = await Promise.all([
       api("/api/summary", { period: state.period, category: state.category, ...currentFilterParams() }),
       api("/api/matrix", { period: state.period, category: state.category, ...currentFilterParams() }),
       api("/api/location-summary", { period: state.period, category: state.category, ...currentFilterParams() }),
       api("/api/customer-summary", { period: state.period, category: state.category, ...currentFilterParams() }),
+      api("/api/category-breakdown", { period: state.period, ...currentFilterParams() }),
     ]);
     renderSummaryCards(summary);
     renderMatrix(matrix);
     renderLocationSummary(locSummary);
     renderCustomerSummary(custSummary);
+    renderCategoryPie("#category-pie", breakdown);
+    renderLocationBar("#location-bar", breakdown);
     updateExportLink();
   }
 
   async function loadMatrixOnly() {
-    const matrix = await api("/api/matrix", { period: state.period, category: state.category, ...currentFilterParams() });
-    renderMatrix(matrix);
+    if (state.view === "breakdown") {
+      const matrix = await api("/api/matrix-breakdown", { period: state.period, ...currentFilterParams() });
+      renderMatrixBreakdown(matrix);
+    } else {
+      const matrix = await api("/api/matrix", { period: state.period, category: state.category, ...currentFilterParams() });
+      renderMatrix(matrix);
+      const legendEl = qs("#matrix-category-legend");
+      if (legendEl) legendEl.innerHTML = "";
+    }
     updateExportLink();
   }
 

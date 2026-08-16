@@ -8,6 +8,7 @@ from __future__ import annotations
 import pandas as pd
 
 from app.mapping_engine import apply_filters, fte_for_period_category, base_location_status
+from app.models import CANONICAL_CATEGORIES
 
 REDUCTION_THRESHOLD = 0  # any negative change flags "released capacity"
 
@@ -86,6 +87,44 @@ def customer_summary(long_df: pd.DataFrame, filters: dict, period: str, category
         })
     rows.sort(key=lambda x: x["total_fte"], reverse=True)
     return rows
+
+
+def category_breakdown(long_df: pd.DataFrame, filters: dict, period: str) -> dict:
+    """
+    Internal/SWC/External/Others composition for the selected period +
+    dimension filters (the "FTE Type" filter itself is ignored here since
+    the whole point is to show every category at once) -- feeds the
+    Dashboard's pie chart (overall split) and stacked bar chart (by
+    location).
+    """
+    filtered = apply_filters(long_df, filters)
+    period_df = filtered[filtered["Period"] == period] if period else filtered.iloc[0:0]
+    cat_df = period_df[period_df["Category"].isin(CANONICAL_CATEGORIES)]
+    present_categories = [c for c in CANONICAL_CATEGORIES if c in set(cat_df["Category"])]
+
+    by_category = []
+    if present_categories:
+        totals = cat_df.groupby("Category")["FTE"].sum()
+        for cat in present_categories:
+            by_category.append({"category": cat, "fte": round(float(totals.get(cat, 0.0)), 1)})
+
+    by_location = []
+    if present_categories:
+        grouped = cat_df.groupby(["Location", "Category"])["FTE"].sum().unstack(fill_value=0.0)
+        grouped = grouped.reindex(columns=present_categories, fill_value=0.0)
+        grouped["__total__"] = grouped.sum(axis=1)
+        grouped = grouped.sort_values("__total__", ascending=False)
+        for loc, row in grouped.iterrows():
+            entry = {"location": loc, "total": round(float(row["__total__"]), 1)}
+            for cat in present_categories:
+                entry[cat] = round(float(row[cat]), 1)
+            by_location.append(entry)
+
+    return {
+        "categories": present_categories,
+        "by_category": by_category,
+        "by_location": by_location,
+    }
 
 
 def period_comparison(long_df: pd.DataFrame, filters: dict, from_period: str, to_period: str, category: str) -> list[dict]:
