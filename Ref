@@ -1,0 +1,17 @@
+cd fte-location-planner
+python build_standalone.py
+
+pip install pyinstaller
+
+pyinstaller --onefile --name OptiView ^
+  --collect-submodules=uvicorn ^
+  --collect-data=jinja2 ^
+  --hidden-import=multipart ^
+  --hidden-import=multipart.multipart ^
+  --exclude-module=matplotlib ^
+  --exclude-module=scipy ^
+  --exclude-module=sqlalchemy ^
+  --exclude-module=tkinter ^
+  --exclude-module=pyarrow ^
+  --exclude-module=PIL ^
+  OptiView_Standalone.py
